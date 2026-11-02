@@ -38,10 +38,16 @@ If this overlaps with the official Spotify client's own notifications, turn off 
 
 ## Release
 
-```sh
-scripts/release.sh
-```
+1. Bump `CFBundleShortVersionString` and `CFBundleVersion` in `Info.plist`, then commit and push.
+2. Run:
 
-Builds a Developer ID-signed, notarized, stapled `build/TrackBanner-<version>.zip` and prints its SHA-256.
+   ```sh
+   scripts/release.sh
+   ```
+
+The script requires a clean working tree that matches `origin/main`.
+It builds a Developer ID-signed, notarized, stapled `build/TrackBanner-<version>.zip`.
+After you confirm, it creates the `v<version>` GitHub release, checks the uploaded file, and updates `version` and `sha256` in [kongchu2/homebrew-tap](https://github.com/kongchu2/homebrew-tap).
+Use `scripts/release.sh --no-publish` to only build and notarize.
+
 It needs a notarytool keychain profile named `trackbanner` (`xcrun notarytool store-credentials trackbanner ...`).
-Upload the zip to a GitHub release tagged `v<version>`, then update `version` and `sha256` in [kongchu2/homebrew-tap](https://github.com/kongchu2/homebrew-tap).
