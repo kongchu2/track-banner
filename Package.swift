@@ -2,9 +2,9 @@
 import PackageDescription
 
 let package = Package(
-    name: "SpotifyAlert",
+    name: "TrackBanner",
     platforms: [.macOS(.v13)],
     targets: [
-        .executableTarget(name: "SpotifyAlert")
+        .executableTarget(name: "TrackBanner")
     ]
 )

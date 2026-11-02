@@ -39,7 +39,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func setUpStatusItem() {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-        item.button?.image = NSImage(systemSymbolName: "music.note", accessibilityDescription: "Spotify Alert")
+        item.button?.image = StatusIcon.make()
         let menu = NSMenu()
         let launchAtLogin = NSMenuItem(title: "로그인 시 자동 실행", action: #selector(toggleLaunchAtLogin(_:)), keyEquivalent: "")
         launchAtLogin.target = self
@@ -48,7 +48,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         hide.target = self
         menu.addItem(hide)
         menu.addItem(.separator())
-        menu.addItem(withTitle: "Spotify Alert 종료", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        menu.addItem(withTitle: "Track Banner 종료", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         item.menu = menu
         item.isVisible = !isStatusItemHidden
         statusItem = item
@@ -64,7 +64,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.activate(ignoringOtherApps: true)
         let alert = NSAlert()
         alert.messageText = "메뉴 막대 아이콘을 숨길까요?"
-        alert.informativeText = "알림은 계속 표시됩니다. 아이콘을 다시 보려면 Finder에서 SpotifyAlert를 한 번 더 실행하세요."
+        alert.informativeText = "알림은 계속 표시됩니다. 아이콘을 다시 보려면 Finder에서 Track Banner를 한 번 더 실행하세요."
         alert.addButton(withTitle: "숨기기")
         alert.addButton(withTitle: "취소")
         if alert.runModal() == .alertFirstButtonReturn {

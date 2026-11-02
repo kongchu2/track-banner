@@ -7,11 +7,12 @@ ARCHS=(--arch arm64 --arch x86_64)
 swift build -c release "${ARCHS[@]}"
 BIN_PATH=$(swift build -c release "${ARCHS[@]}" --show-bin-path)
 
-APP=build/SpotifyAlert.app
+APP=build/TrackBanner.app
 rm -rf "$APP"
-mkdir -p "$APP/Contents/MacOS"
-cp "$BIN_PATH/SpotifyAlert" "$APP/Contents/MacOS/"
+mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
+cp "$BIN_PATH/TrackBanner" "$APP/Contents/MacOS/"
 cp Info.plist "$APP/Contents/"
+cp Resources/AppIcon.icns "$APP/Contents/Resources/"
 codesign --force --sign - "$APP"
 
 echo "Built $APP"
