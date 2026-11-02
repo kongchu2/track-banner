@@ -45,9 +45,11 @@ If this overlaps with the official Spotify client's own notifications, turn off 
    scripts/release.sh
    ```
 
-The script requires a clean working tree that matches `origin/main`.
-It builds a Developer ID-signed, notarized, stapled `build/TrackBanner-<version>.zip`.
-After you confirm, it creates the `v<version>` GitHub release, checks the uploaded file, and updates `version` and `sha256` in [kongchu2/homebrew-tap](https://github.com/kongchu2/homebrew-tap).
-Use `scripts/release.sh --no-publish` to only build and notarize.
+The script builds a Developer ID-signed, notarized, stapled `build/TrackBanner-<version>.zip` from a clean working tree.
+After you confirm, it uploads a draft `v<version>` GitHub release and checks the uploaded file's SHA-256.
+Then it publishes the release and updates `version` and `sha256` in [kongchu2/homebrew-tap](https://github.com/kongchu2/homebrew-tap).
+Publishing also requires HEAD to match `origin/main` and the tag not to exist yet; these checks run before the build.
+
+`scripts/release.sh --no-publish` only builds and notarizes, and works on any clean commit.
 
 It needs a notarytool keychain profile named `trackbanner` (`xcrun notarytool store-credentials trackbanner ...`).
