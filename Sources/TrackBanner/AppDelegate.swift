@@ -90,6 +90,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func trackChanged(_ track: Track) {
+        // 앱을 켤 때 조회해 이미 표시 중인 곡을 재생한 경우: 받아 둔 커버를 그대로 써서
+        // 기본 아이콘으로 깜빡이거나 다시 받지 않는다.
+        if track.id == latestTrackID, let artwork = latestArtwork {
+            trackEventCount += 1
+            latestTrack = track
+            updateStatusItem()
+            banner.show(track: track, artwork: artwork)
+            return
+        }
         showInStatusItem(track)
         Task {
             let artwork = await ArtworkLoader.artwork(for: track)
