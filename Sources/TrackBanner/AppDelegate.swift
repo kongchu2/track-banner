@@ -23,6 +23,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         get { UserDefaults.standard.bool(forKey: Self.showArtistKey) }
         set { UserDefaults.standard.set(newValue, forKey: Self.showArtistKey); updateStatusItem() }
     }
+    private static let bannerDisabledKey = "BannerDisabled"
+    /// 곡이 바뀔 때 배너를 띄우지 않는다(메뉴 막대 표시만 쓰고 싶을 때).
+    private var isBannerDisabled: Bool {
+        get { UserDefaults.standard.bool(forKey: Self.bannerDisabledKey) }
+        set { UserDefaults.standard.set(newValue, forKey: Self.bannerDisabledKey) }
+    }
     private var latestArtwork: NSImage?
     private var latestTrack: Track?
 
@@ -96,7 +102,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             trackEventCount += 1
             latestTrack = track
             updateStatusItem()
-            banner.show(track: track, artwork: artwork)
+            if !isBannerDisabled { banner.show(track: track, artwork: artwork) }
             return
         }
         showInStatusItem(track)
@@ -106,7 +112,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             guard latestTrackID == track.id else { return }
             latestArtwork = artwork
             updateStatusItem()
-            banner.show(track: track, artwork: artwork)
+            if !isBannerDisabled { banner.show(track: track, artwork: artwork) }
         }
     }
 
@@ -136,6 +142,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let launchAtLogin = NSMenuItem(title: "로그인 시 자동 실행", action: #selector(toggleLaunchAtLogin(_:)), keyEquivalent: "")
         launchAtLogin.target = self
         menu.addItem(launchAtLogin)
+        let disableBanner = NSMenuItem(title: "배너 알림 끄기", action: #selector(toggleBannerDisabled(_:)), keyEquivalent: "")
+        disableBanner.target = self
+        menu.addItem(disableBanner)
         let showArt = NSMenuItem(title: "메뉴 막대에 앨범 커버 표시", action: #selector(toggleShowArtwork(_:)), keyEquivalent: "")
         showArt.target = self
         menu.addItem(showArt)
@@ -160,6 +169,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         isStatusItemHidden = false
         loadCurrentTrackArtwork()
         return false
+    }
+
+    @objc private func toggleBannerDisabled(_ sender: NSMenuItem) {
+        isBannerDisabled.toggle()
     }
 
     @objc private func toggleShowArtwork(_ sender: NSMenuItem) {
@@ -217,6 +230,9 @@ extension AppDelegate: NSMenuItemValidation {
             case .requiresApproval: menuItem.state = .mixed
             default: menuItem.state = .off
             }
+        }
+        if menuItem.action == #selector(toggleBannerDisabled(_:)) {
+            menuItem.state = isBannerDisabled ? .on : .off
         }
         if menuItem.action == #selector(toggleShowArtwork(_:)) {
             menuItem.state = showsArtwork ? .on : .off

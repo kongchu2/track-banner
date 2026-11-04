@@ -23,7 +23,7 @@ Requires macOS 13 or later and Xcode (or a Swift toolchain).
 open build/TrackBanner.app
 ```
 
-From the banner-shaped icon in the menu bar you can turn on **Launch at Login**, choose to show the current track's **album cover**, **title**, or **artist** in the menu bar, hide the icon, or quit the app.
+From the banner-shaped icon in the menu bar you can turn on **Launch at Login**, turn banners off, choose to show the current track's **album cover**, **title**, or **artist** in the menu bar, hide the icon, or quit the app.
 A hidden icon comes back when you open the app again.
 Launch at Login remembers where the app was when you turned it on, so move `build/TrackBanner.app` to `/Applications` first.
 
