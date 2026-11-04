@@ -21,7 +21,7 @@ cp Resources/AppIcon.icns "$APP/Contents/Resources/"
 # Developer ID 서명에는 공증에 필요한 강화된 런타임 + 보안 타임스탬프를 붙인다.
 SIGN_OPTS=(--force --sign "$SIGN_IDENTITY")
 if [ "$SIGN_IDENTITY" != "-" ]; then
-    SIGN_OPTS+=(--options runtime --timestamp)
+    SIGN_OPTS+=(--options runtime --timestamp --entitlements TrackBanner.entitlements)
 fi
 codesign "${SIGN_OPTS[@]}" "$APP"
 

@@ -3,7 +3,7 @@
 Shows a banner in the top-right corner of your macOS screen whenever the track changes in Spotify.
 Unlike system notifications, the **album cover** takes the place of the app icon.
 
-Album art comes from the URL provided by Spotifast, or from the Spotify oEmbed API. No login or extra permissions are required.
+Album art comes from the Spotify oEmbed API, so no login is required.
 
 ## Install
 
@@ -23,7 +23,7 @@ Requires macOS 13 or later and Xcode (or a Swift toolchain).
 open build/TrackBanner.app
 ```
 
-From the banner-shaped icon in the menu bar you can turn on **Launch at Login**, hide the icon, or quit the app.
+From the banner-shaped icon in the menu bar you can turn on **Launch at Login**, choose to show the current track's **album cover**, **title**, or **artist** in the menu bar, hide the icon, or quit the app.
 A hidden icon comes back when you open the app again.
 Launch at Login remembers where the app was when you turned it on, so move `build/TrackBanner.app` to `/Applications` first.
 
@@ -33,6 +33,8 @@ Launch at Login remembers where the app was when you turned it on, so move `buil
 - The banner disappears after 2.5 seconds. Hovering keeps it on screen and shows a close button in the top-left corner.
 - Clicking the banner brings Spotify to the front; the close button just dismisses it.
 - Uses a Liquid Glass background on macOS 26 and a blurred background on earlier versions.
+- The menu bar cover, title, and artist clear when playback stops, Spotify quits, or an ad plays. They stay while paused.
+- With any of those menu bar options on, the app asks Spotify for the current track when it launches, so macOS asks once for permission to control Spotify. With all of them off, it never asks.
 
 If this overlaps with the official Spotify client's own notifications, turn off "Show desktop notifications when the song changes" in Spotify's settings.
 

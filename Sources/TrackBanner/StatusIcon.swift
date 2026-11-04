@@ -39,3 +39,31 @@ enum StatusIcon {
         return image
     }
 }
+
+extension StatusIcon {
+    /// 앨범 커버를 메뉴 막대 크기의 둥근 정사각형으로 만든다.
+    /// 커버 색을 그대로 보여야 하므로 템플릿 이미지가 아니다.
+    /// 라이트/다크 어느 메뉴 막대에서도 보이도록 옅은 테두리를 두른다.
+    static func make(artwork: NSImage) -> NSImage {
+        let side: CGFloat = 18
+        let image = NSImage(size: NSSize(width: side, height: side), flipped: false) { rect in
+            let inset = rect.insetBy(dx: 0.5, dy: 0.5)
+            let path = NSBezierPath(roundedRect: inset, xRadius: 3.5, yRadius: 3.5)
+            NSGraphicsContext.saveGraphicsState()
+            path.addClip()
+            // 정사각형이 아닌 이미지는 가운데를 잘라 채운다.
+            let src = artwork.size
+            let edge = min(src.width, src.height)
+            let from = NSRect(x: (src.width - edge) / 2, y: (src.height - edge) / 2, width: edge, height: edge)
+            artwork.draw(in: inset, from: from, operation: .sourceOver, fraction: 1)
+            NSGraphicsContext.restoreGraphicsState()
+            NSColor.gray.withAlphaComponent(0.5).setStroke()
+            path.lineWidth = 1
+            path.stroke()
+            return true
+        }
+        image.isTemplate = false
+        image.accessibilityDescription = "Track Banner"
+        return image
+    }
+}

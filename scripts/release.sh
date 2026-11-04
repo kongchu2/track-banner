@@ -83,6 +83,9 @@ codesign --verify --strict --verbose=2 "$APP"
 SIGN_INFO=$(codesign -dvv "$APP" 2>&1)
 [[ "$SIGN_INFO" == *$'\nAuthority=Developer ID Application'* ]] || die "Developer ID 로 서명되지 않았습니다."
 [[ "$SIGN_INFO" == *$'\nTeamIdentifier='"$TEAM_ID"* ]] || die "팀 $TEAM_ID 의 인증서로 서명되지 않았습니다."
+# 강화된 런타임에서 Spotify에 Apple Event를 보내려면 이 권한이 서명에 들어 있어야 한다(빠져도 공증은 통과한다).
+ENTITLEMENTS=$(codesign -d --entitlements - --xml "$APP" 2>/dev/null) || ENTITLEMENTS=""
+[[ "$ENTITLEMENTS" == *"com.apple.security.automation.apple-events"* ]] || die "서명에 Apple Events 자동화 권한(entitlement)이 없습니다."
 
 # ---- 공증 ----
 

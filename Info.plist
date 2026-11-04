@@ -15,11 +15,13 @@
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.1.0</string>
+    <string>1.2.0</string>
     <key>CFBundleVersion</key>
-    <string>2</string>
+    <string>3</string>
     <key>LSMinimumSystemVersion</key>
     <string>13.0</string>
+    <key>NSAppleEventsUsageDescription</key>
+    <string>메뉴 막대에 앨범 커버·제목·아티스트를 표시하도록 설정한 경우, 앱을 켤 때 이미 재생 중인 곡을 보여주기 위해 Spotify에 현재 곡을 물어봅니다.</string>
     <key>LSUIElement</key>
     <true/>
 </dict>

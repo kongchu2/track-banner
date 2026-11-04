@@ -1,17 +1,12 @@
 import AppKit
 
-/// 앨범 커버를 가져온다. URL을 이미 알면 그대로 받고,
-/// 모르면 Spotify oEmbed API로 찾는다(인증이나 자동화 권한이 필요 없다).
+/// 앨범 커버를 Spotify oEmbed API로 찾아 가져온다(인증이나 자동화 권한이 필요 없다).
 enum ArtworkLoader {
     private struct OEmbed: Decodable {
         let thumbnail_url: String
     }
 
     static func artwork(for track: Track) async -> NSImage? {
-        if let url = track.artworkURL {
-            return await image(at: url)
-        }
-
         // spotify:track:ID → https://open.spotify.com/track/ID
         let parts = track.id.split(separator: ":")
         guard parts.count == 3, parts[1] == "track" || parts[1] == "episode" else { return nil }
