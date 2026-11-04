@@ -13,8 +13,11 @@ final class SpotifyWatcher: NSObject {
     nonisolated private static let bundleID = "com.spotify.client"
 
     var onTrackChange: ((Track) -> Void)?
-    /// 재생이 정지되거나, 광고가 나오거나, Spotify가 종료됐을 때(일시정지는 해당하지 않는다).
+    /// 재생이 정지되거나, 광고가 나오거나, Spotify가 종료됐을 때.
     var onStop: (() -> Void)?
+    /// 재생이 일시정지됐을 때. 같은 곡이 재개되면 onTrackChange 대신 onResume이 불린다.
+    var onPause: (() -> Void)?
+    var onResume: ((Track) -> Void)?
     private var lastTrackID: String?
 
     func start() {
@@ -43,7 +46,7 @@ final class SpotifyWatcher: NSObject {
         let source = """
         if application "Spotify" is running then
             tell application "Spotify"
-                if player state is stopped then return ""
+                if player state is not playing then return ""
                 set t to current track
                 return (id of t) & linefeed & (name of t) & linefeed & (artist of t) & linefeed & (album of t)
             end tell
@@ -76,18 +79,24 @@ final class SpotifyWatcher: NSObject {
             stopped()
             return
         }
-        guard let info = note.userInfo,
-              state == "Playing",
-              let id,
-              id != lastTrackID  // 일시정지 후 재개는 무시
-        else { return }
+        if state == "Paused" {
+            onPause?()
+            return
+        }
+        guard let info = note.userInfo, state == "Playing", let id else { return }
 
-        lastTrackID = id
-        onTrackChange?(Track(
+        let track = Track(
             id: id,
             name: info["Name"] as? String ?? "",
             artist: info["Artist"] as? String ?? "",
             album: info["Album"] as? String ?? ""
-        ))
+        )
+        if id == lastTrackID {
+            // 일시정지 후 재개: 새 곡이 아니므로 배너는 띄우지 않는다.
+            onResume?(track)
+        } else {
+            lastTrackID = id
+            onTrackChange?(track)
+        }
     }
 }

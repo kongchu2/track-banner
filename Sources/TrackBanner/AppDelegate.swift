@@ -69,6 +69,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         spotifyWatcher.onTrackChange = { [weak self] in self?.trackChanged($0) }
         spotifyWatcher.onStop = { [weak self] in self?.playerStopped() }
+        spotifyWatcher.onPause = { [weak self] in self?.playerStopped() }
+        spotifyWatcher.onResume = { [weak self] in self?.trackResumed($0) }
         spotifyWatcher.start()
         loadCurrentTrackArtwork()
     }
@@ -128,7 +130,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         updateStatusItem()
     }
 
-    /// Spotify가 정지·종료되면 메뉴 막대에서 곡 정보를 지운다.
+    /// 일시정지했던 곡을 다시 재생하면 배너 없이 메뉴 막대에만 다시 표시한다.
+    private func trackResumed(_ track: Track) {
+        // 탐색(seek) 등으로 재생 중에 같은 곡의 "Playing" 알림이 또 오면 이미 표시 중이다.
+        // 다시 처리하면 커버가 기본 아이콘으로 깜빡이고 매번 다시 내려받는다.
+        guard track.id != latestTrackID else { return }
+        showInStatusItem(track)
+        Task {
+            let artwork = await ArtworkLoader.artwork(for: track)
+            guard latestTrackID == track.id else { return }
+            latestArtwork = artwork
+            updateStatusItem()
+        }
+    }
+
+    /// Spotify가 일시정지·정지·종료되면 메뉴 막대에서 곡 정보를 지운다.
     private func playerStopped() {
         trackEventCount += 1
         latestTrackID = nil
