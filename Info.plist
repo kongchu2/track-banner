@@ -2,27 +2,27 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <key>CFBundleIdentifier</key>
-    <string>com.kongchu2.trackbanner</string>
-    <key>CFBundleName</key>
-    <string>TrackBanner</string>
-    <key>CFBundleDisplayName</key>
-    <string>Track Banner</string>
-    <key>CFBundleExecutable</key>
-    <string>TrackBanner</string>
-    <key>CFBundleIconFile</key>
-    <string>AppIcon</string>
-    <key>CFBundlePackageType</key>
-    <string>APPL</string>
-    <key>CFBundleShortVersionString</key>
-    <string>1.2.0</string>
-    <key>CFBundleVersion</key>
-    <string>3</string>
-    <key>LSMinimumSystemVersion</key>
-    <string>13.0</string>
-    <key>NSAppleEventsUsageDescription</key>
-    <string>메뉴 막대에 앨범 커버·제목·아티스트를 표시하도록 설정한 경우, 앱을 켤 때 이미 재생 중인 곡을 보여주기 위해 Spotify에 현재 곡을 물어봅니다.</string>
-    <key>LSUIElement</key>
-    <true/>
+	<key>CFBundleDisplayName</key>
+	<string>Track Banner</string>
+	<key>CFBundleExecutable</key>
+	<string>TrackBanner</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
+	<key>CFBundleIdentifier</key>
+	<string>com.kongchu2.trackbanner</string>
+	<key>CFBundleName</key>
+	<string>TrackBanner</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>1.3.0</string>
+	<key>CFBundleVersion</key>
+	<string>4</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>13.0</string>
+	<key>LSUIElement</key>
+	<true/>
+	<key>NSAppleEventsUsageDescription</key>
+	<string>메뉴 막대에 앨범 커버·제목·아티스트를 표시하도록 설정한 경우, 앱을 켤 때 이미 재생 중인 곡을 보여주기 위해 Spotify에 현재 곡을 물어봅니다.</string>
 </dict>
 </plist>
