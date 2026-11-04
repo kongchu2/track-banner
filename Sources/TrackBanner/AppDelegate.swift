@@ -35,12 +35,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// 메뉴 막대 아이콘(커버)과 글자(제목/아티스트)를 현재 설정과 곡에 맞게 갱신한다.
     private func updateStatusItem() {
         guard let button = statusItem?.button else { return }
-        if showsArtwork, let latestArtwork {
-            button.image = StatusIcon.make(artwork: latestArtwork)
-        } else {
-            button.image = StatusIcon.make()
-        }
-
         var parts: [String] = []
         if let track = latestTrack {
             if showsTitle, !track.name.isEmpty { parts.append(track.name) }
@@ -48,6 +42,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         let text = parts.joined(separator: " – ")
         // 메뉴 막대가 너무 길어지지 않도록 자른다.
+        let icon: NSImage
+        if showsArtwork, let latestArtwork {
+            icon = StatusIcon.make(artwork: latestArtwork)
+        } else {
+            icon = StatusIcon.make()
+        }
+        // 글자가 있을 때만 아이콘과 글자 사이를 벌린다.
+        button.image = text.isEmpty ? icon : StatusIcon.padded(icon, trailing: 5)
         button.title = text.count > 40 ? String(text.prefix(39)) + "…" : text
         button.imagePosition = text.isEmpty ? .imageOnly : .imageLeading
         statusItem?.length = text.isEmpty ? NSStatusItem.squareLength : NSStatusItem.variableLength

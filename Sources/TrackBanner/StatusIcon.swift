@@ -67,3 +67,17 @@ extension StatusIcon {
         return image
     }
 }
+
+extension StatusIcon {
+    /// 이미지 오른쪽에 투명 여백을 붙여 옆의 글자와 간격을 벌린다.
+    static func padded(_ image: NSImage, trailing: CGFloat) -> NSImage {
+        let size = NSSize(width: image.size.width + trailing, height: image.size.height)
+        let result = NSImage(size: size, flipped: false) { _ in
+            image.draw(in: NSRect(origin: .zero, size: image.size))
+            return true
+        }
+        result.isTemplate = image.isTemplate
+        result.accessibilityDescription = image.accessibilityDescription
+        return result
+    }
+}
