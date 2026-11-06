@@ -16,6 +16,12 @@ brew install kongchu2/tap/track-banner
 Or download the latest `TrackBanner-<version>.zip` from [Releases](https://github.com/kongchu2/track-banner/releases), unzip it, and move `TrackBanner.app` to `/Applications`.
 The app is signed with Developer ID and notarized by Apple.
 
+## Usage
+
+From the banner-shaped icon in the menu bar you can turn on **Launch at Login**, turn banners off, choose to show the current track's **album cover**, **title**, or **artist** in the menu bar, hide the icon, or quit the app.
+A hidden icon comes back when you open the app again.
+Launch at Login remembers where the app was when you turned it on, so move the app to its final location first.
+
 ## Build & Run
 
 Requires macOS 13 or later and Xcode (or a Swift toolchain).
@@ -25,9 +31,7 @@ Requires macOS 13 or later and Xcode (or a Swift toolchain).
 open build/TrackBanner.app
 ```
 
-From the banner-shaped icon in the menu bar you can turn on **Launch at Login**, turn banners off, choose to show the current track's **album cover**, **title**, or **artist** in the menu bar, hide the icon, or quit the app.
-A hidden icon comes back when you open the app again.
-Launch at Login remembers where the app was when you turned it on, so move `build/TrackBanner.app` to `/Applications` first.
+Move `build/TrackBanner.app` to `/Applications` before turning on Launch at Login.
 
 ## Behavior
 
@@ -57,3 +61,7 @@ Publishing also requires HEAD to match `origin/main` and the tag not to exist ye
 `scripts/release.sh --no-publish` only builds and notarizes, and works on any clean commit.
 
 It needs a notarytool keychain profile named `trackbanner` (`xcrun notarytool store-credentials trackbanner ...`).
+
+## License
+
+[MIT](LICENSE)
