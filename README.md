@@ -5,7 +5,7 @@ Unlike system notifications, the **album cover** takes the place of the app icon
 
 Album art comes from the Spotify oEmbed API, so no login is required.
 
-<img src="docs/images/banner.png" width="390" alt="Banner with album cover in the top-right corner, and the current track in the menu bar">
+<img src="docs/images/banner.png" alt="Banner with album cover in the top-right corner, and the current track in the menu bar">
 
 ## Install
 
