@@ -22,6 +22,16 @@ From the banner-shaped icon in the menu bar you can turn on **Launch at Login**,
 A hidden icon comes back when you open the app again.
 Launch at Login remembers where the app was when you turned it on, so move the app to its final location first.
 
+## Tracking other apps (Spotifast, web player, ...)
+
+Only the official Spotify desktop client sends the track-change events this app listens to.
+To follow playback from other apps, choose **Spotify 연결** in the menu and connect the Spotify Web API; the app then polls your currently playing track every 3 seconds (every 10 seconds while nothing is playing).
+
+1. Create an app at [developer.spotify.com/dashboard](https://developer.spotify.com/dashboard), add `trackbanner://callback` as a Redirect URI, and select **Web API**.
+2. Paste its Client ID into the dialog and approve the login in your browser.
+
+Only the `user-read-currently-playing` scope is requested, and the refresh token is kept in your Keychain. Choose **Spotify 연결 해제** to remove it.
+
 ## Build & Run
 
 Requires macOS 13 or later and Xcode (or a Swift toolchain).

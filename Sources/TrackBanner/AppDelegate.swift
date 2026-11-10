@@ -4,6 +4,10 @@ import ServiceManagement
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private let spotifyWatcher = SpotifyWatcher()
+    private let spotifyAuth = SpotifyAuth()
+    private lazy var webWatcher = WebAPIWatcher(auth: spotifyAuth)
+    /// 두 소스가 본 상태를 합쳐 지금 재생 중인 곡과 배너 여부를 정한다.
+    private let playback = PlaybackCoordinator()
     private let banner = BannerController()
     private var statusItem: NSStatusItem?
     private var latestTrackID: String?
@@ -64,89 +68,135 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    func applicationWillFinishLaunching(_ notification: Notification) {
+        // Spotify 로그인이 끝나면 브라우저가 trackbanner://callback?code=... 로 돌려보낸다.
+        NSAppleEventManager.shared().setEventHandler(
+            self,
+            andSelector: #selector(handleURLEvent(_:reply:)),
+            forEventClass: AEEventClass(kInternetEventClass),
+            andEventID: AEEventID(kAEGetURL)
+        )
+    }
+
+    /// 메뉴 막대에 보이지는 않지만, 이게 있어야 입력창에서 ⌘V/⌘C/⌘X/⌘A가 동작한다.
+    private func setUpEditMenu() {
+        let mainMenu = NSMenu()
+        let editItem = NSMenuItem()
+        mainMenu.addItem(editItem)
+        let edit = NSMenu(title: "Edit")
+        edit.addItem(withTitle: "Cut", action: #selector(NSText.cut(_:)), keyEquivalent: "x")
+        edit.addItem(withTitle: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
+        edit.addItem(withTitle: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
+        edit.addItem(withTitle: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
+        editItem.submenu = edit
+        NSApp.mainMenu = mainMenu
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
+        setUpEditMenu()
         setUpStatusItem()
 
-        spotifyWatcher.onTrackChange = { [weak self] in self?.trackChanged($0) }
-        spotifyWatcher.onStop = { [weak self] in self?.playerStopped() }
-        spotifyWatcher.onPause = { [weak self] in self?.playerStopped() }
-        spotifyWatcher.onResume = { [weak self] in self?.trackResumed($0) }
+        playback.onChange = { [weak self] in self?.playbackChanged($0, isNewTrack: $1) }
+        playback.onWebStateInvalidated = { [weak self] in self?.webWatcher.restart() }
+        spotifyWatcher.onState = { [weak self] in self?.playback.clientReported($0) }
         spotifyWatcher.start()
+
+        webWatcher.onState = { [weak self] in self?.playback.webReported($0) }
+        spotifyAuth.onChange = { [weak self] in self?.updateWebAPIPolling() }
+        updateWebAPIPolling()
+
         loadCurrentTrackArtwork()
     }
 
-    private var isQueryingCurrentTrack = false
-    /// 곡 변경·정지가 있을 때마다 늘어난다. 늦게 끝난 시작 시 조회가 그 뒤의 상태를 덮어쓰지 않게 한다.
-    private var trackEventCount = 0
+    private func updateWebAPIPolling() {
+        if spotifyAuth.isConnected {
+            webWatcher.start()
+        } else {
+            webWatcher.stop()
+            playback.webDisconnected()
+        }
+    }
 
-    /// 앱을 켠 시점에 이미 재생 중인 곡의 커버를 메뉴 막대에만 반영한다(배너는 띄우지 않는다).
+    @objc private func handleURLEvent(_ event: NSAppleEventDescriptor, reply: NSAppleEventDescriptor) {
+        guard let string = event.paramDescriptor(forKeyword: keyDirectObject)?.stringValue,
+              let url = URL(string: string) else { return }
+        Task {
+            let result = await spotifyAuth.handleCallback(url)
+            // Task 안에서 runModal을 부르면 알림창이 떠 있는 동안 다른 MainActor 작업(폴링, 커버 로딩)이 멈춘다.
+            // 런루프 블록으로 넘겨 Task 밖에서 띄운다.
+            RunLoop.main.perform {
+                MainActor.assumeIsolated { self.showLoginResult(result) }
+            }
+        }
+    }
+
+    private func showLoginResult(_ result: SpotifyAuth.CallbackResult) {
+        let alert = NSAlert()
+        switch result {
+        case .ignored, .cancelled:
+            // 우리가 시작한 로그인의 응답이 아니거나 사용자가 직접 취소했다. 알릴 것이 없다.
+            return
+        case .connected:
+            alert.messageText = "Spotify에 연결됐습니다"
+            alert.informativeText = "이제 Spotifast, 웹 플레이어 등 다른 앱에서 재생하는 곡도 따라갑니다. 브라우저 탭은 닫아도 됩니다."
+        case .failed:
+            alert.messageText = "Spotify 연결에 실패했습니다"
+            alert.informativeText = "Client ID와 Redirect URI(\(SpotifyAuth.redirectURI))가 Spotify 대시보드 설정과 같은지 확인한 뒤 다시 시도하세요."
+        case .keychainFailed:
+            alert.messageText = "Spotify 연결을 저장하지 못했습니다"
+            alert.informativeText = "로그인은 됐지만 키체인에 저장할 수 없었습니다. 키체인 접근을 허용한 뒤 다시 연결하세요."
+        }
+        NSApp.activate(ignoringOtherApps: true)
+        alert.runModal()
+    }
+
+    private var isQueryingCurrentTrack = false
+
+    /// 앱을 켠 시점에 이미 재생 중인 곡을 메뉴 막대에만 반영한다(배너는 띄우지 않는다).
     /// 메뉴 막대 표시 옵션이 하나라도 켜져 있고 아이콘이 보일 때만 물어봐서, 쓰지 않는 표시를 위해 자동화 권한을 요청하지 않는다.
     private func loadCurrentTrackArtwork() {
         guard showsArtwork || showsTitle || showsArtist, !isStatusItemHidden,
               latestTrackID == nil, !isQueryingCurrentTrack else { return }
         isQueryingCurrentTrack = true
-        let eventCountAtStart = trackEventCount
+        let reportCountAtStart = playback.clientReportCount
         Task {
             defer { isQueryingCurrentTrack = false }
             guard let track = await Task.detached(operation: { SpotifyWatcher.currentTrack() }).value else { return }
             // 그사이 곡 변경·정지 알림이 왔으면 그쪽이 최신이다(자동화 권한 팝업 동안 조회가 오래 멈출 수 있다).
-            guard trackEventCount == eventCountAtStart else { return }
-            showInStatusItem(track)
-            let artwork = await ArtworkLoader.artwork(for: track)
-            guard latestTrackID == track.id else { return }
-            latestArtwork = artwork
-            updateStatusItem()
+            guard playback.clientReportCount == reportCountAtStart else { return }
+            playback.clientWasAlreadyPlaying(track)
         }
     }
 
-    private func trackChanged(_ track: Track) {
-        // 앱을 켤 때 조회해 이미 표시 중인 곡을 재생한 경우: 받아 둔 커버를 그대로 써서
-        // 기본 아이콘으로 깜빡이거나 다시 받지 않는다.
-        if track.id == latestTrackID, let artwork = latestArtwork {
-            trackEventCount += 1
-            latestTrack = track
-            updateStatusItem()
-            if !isBannerDisabled { banner.show(track: track, artwork: artwork) }
-            return
-        }
-        showInStatusItem(track)
-        Task {
-            let artwork = await ArtworkLoader.artwork(for: track)
-            // 커버를 받는 사이 곡이 또 바뀌었으면 옛 알림은 버린다.
-            guard latestTrackID == track.id else { return }
-            latestArtwork = artwork
-            updateStatusItem()
-            if !isBannerDisabled { banner.show(track: track, artwork: artwork) }
+    /// 합쳐진 재생 상태가 바뀌었을 때.
+    private func playbackChanged(_ state: PlaybackState, isNewTrack: Bool) {
+        switch state {
+        case .playing(let track):
+            show(track, withBanner: isNewTrack && !isBannerDisabled)
+        case .paused, .stopped:
+            clearStatusItem()
         }
     }
 
     /// 제목·아티스트는 이미 알고 있으니 커버 다운로드를 기다리지 않고 바로 반영한다.
     /// 이전 곡 커버가 남지 않도록 새 커버가 올 때까지는 기본 아이콘을 보여준다.
-    private func showInStatusItem(_ track: Track) {
-        trackEventCount += 1
+    private func show(_ track: Track, withBanner: Bool) {
         latestTrackID = track.id
         latestTrack = track
         latestArtwork = nil
         updateStatusItem()
-    }
-
-    /// 일시정지했던 곡을 다시 재생하면 배너 없이 메뉴 막대에만 다시 표시한다.
-    private func trackResumed(_ track: Track) {
-        // 탐색(seek) 등으로 재생 중에 같은 곡의 "Playing" 알림이 또 오면 이미 표시 중이다.
-        // 다시 처리하면 커버가 기본 아이콘으로 깜빡이고 매번 다시 내려받는다.
-        guard track.id != latestTrackID else { return }
-        showInStatusItem(track)
         Task {
             let artwork = await ArtworkLoader.artwork(for: track)
+            // 커버를 받는 사이 곡이 또 바뀌었거나 멈췄으면 옛 알림은 버린다.
             guard latestTrackID == track.id else { return }
             latestArtwork = artwork
             updateStatusItem()
+            if withBanner { banner.show(track: track, artwork: artwork) }
         }
     }
 
-    /// Spotify가 일시정지·정지·종료되면 메뉴 막대에서 곡 정보를 지운다.
-    private func playerStopped() {
-        trackEventCount += 1
+    /// 일시정지·정지·종료되면 메뉴 막대에서 곡 정보를 지운다.
+    private func clearStatusItem() {
         latestTrackID = nil
         latestTrack = nil
         latestArtwork = nil
@@ -172,6 +222,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let showArtist = NSMenuItem(title: "메뉴 막대에 아티스트 표시", action: #selector(toggleShowArtist(_:)), keyEquivalent: "")
         showArtist.target = self
         menu.addItem(showArtist)
+        let webAPI = NSMenuItem(title: "Spotify 연결(다른 앱 재생 추적)…", action: #selector(toggleWebAPI(_:)), keyEquivalent: "")
+        webAPI.target = self
+        menu.addItem(webAPI)
         let hide = NSMenuItem(title: "메뉴 막대에서 숨기기", action: #selector(hideStatusItem(_:)), keyEquivalent: "")
         hide.target = self
         menu.addItem(hide)
@@ -206,6 +259,35 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func toggleShowArtist(_ sender: NSMenuItem) {
         showsArtist.toggle()
         loadCurrentTrackArtwork()
+    }
+
+    @objc private func toggleWebAPI(_ sender: NSMenuItem) {
+        if spotifyAuth.isConnected {
+            spotifyAuth.disconnect()
+            return
+        }
+        NSApp.activate(ignoringOtherApps: true)
+        let alert = NSAlert()
+        alert.messageText = "Spotify 연결"
+        alert.informativeText = """
+        Spotifast, 웹 플레이어처럼 알림을 보내지 않는 앱의 재생도 추적하려면 Spotify Web API에 연결합니다.
+
+        1. developer.spotify.com/dashboard 에서 앱을 만듭니다.
+        2. Redirect URI에 \(SpotifyAuth.redirectURI) 를 추가하고 Web API를 선택합니다.
+        3. 앱의 Client ID를 아래에 붙여넣습니다.
+        """
+        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 300, height: 24))
+        field.placeholderString = "Client ID"
+        field.stringValue = spotifyAuth.clientID ?? ""
+        alert.accessoryView = field
+        alert.addButton(withTitle: "연결")
+        alert.addButton(withTitle: "취소")
+        alert.window.initialFirstResponder = field
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        let id = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !id.isEmpty else { return }
+        spotifyAuth.clientID = id
+        spotifyAuth.beginLogin()
     }
 
     @objc private func hideStatusItem(_ sender: NSMenuItem) {
@@ -248,6 +330,10 @@ extension AppDelegate: NSMenuItemValidation {
             case .requiresApproval: menuItem.state = .mixed
             default: menuItem.state = .off
             }
+        }
+        if menuItem.action == #selector(toggleWebAPI(_:)) {
+            menuItem.title = spotifyAuth.isConnected ? "Spotify 연결 해제" : "Spotify 연결(다른 앱 재생 추적)…"
+            menuItem.state = spotifyAuth.isConnected ? .on : .off
         }
         if menuItem.action == #selector(toggleBannerDisabled(_:)) {
             menuItem.state = isBannerDisabled ? .on : .off

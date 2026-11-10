@@ -12,13 +12,8 @@ struct Track {
 final class SpotifyWatcher: NSObject {
     nonisolated private static let bundleID = "com.spotify.client"
 
-    var onTrackChange: ((Track) -> Void)?
-    /// 재생이 정지되거나, 광고가 나오거나, Spotify가 종료됐을 때.
-    var onStop: (() -> Void)?
-    /// 재생이 일시정지됐을 때. 같은 곡이 재개되면 onTrackChange 대신 onResume이 불린다.
-    var onPause: (() -> Void)?
-    var onResume: ((Track) -> Void)?
-    private var lastTrackID: String?
+    /// 알림이 올 때마다 그 시점의 상태를 알린다. 중복 제거는 PlaybackCoordinator가 한다.
+    var onState: ((PlaybackState) -> Void)?
 
     func start() {
         // 앱이 비활성 상태여도 바로 받도록 deliverImmediately를 쓴다.
@@ -63,12 +58,7 @@ final class SpotifyWatcher: NSObject {
         guard let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
               app.bundleIdentifier == Self.bundleID
         else { return }
-        stopped()
-    }
-
-    private func stopped() {
-        lastTrackID = nil
-        onStop?()
+        onState?(.stopped)
     }
 
     @objc private func playbackStateChanged(_ note: Notification) {
@@ -76,27 +66,20 @@ final class SpotifyWatcher: NSObject {
         let id = note.userInfo?["Track ID"] as? String
         // 광고 중에는 직전 곡이 아직 재생 중인 것처럼 보이지 않도록 정지와 같게 처리한다.
         if state == "Stopped" || (state == "Playing" && id?.hasPrefix("spotify:ad:") == true) {
-            stopped()
+            onState?(.stopped)
             return
         }
         if state == "Paused" {
-            onPause?()
+            onState?(.paused)
             return
         }
         guard let info = note.userInfo, state == "Playing", let id else { return }
 
-        let track = Track(
+        onState?(.playing(Track(
             id: id,
             name: info["Name"] as? String ?? "",
             artist: info["Artist"] as? String ?? "",
             album: info["Album"] as? String ?? ""
-        )
-        if id == lastTrackID {
-            // 일시정지 후 재개: 새 곡이 아니므로 배너는 띄우지 않는다.
-            onResume?(track)
-        } else {
-            lastTrackID = id
-            onTrackChange?(track)
-        }
+        )))
     }
 }
