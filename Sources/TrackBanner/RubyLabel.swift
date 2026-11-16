@@ -14,6 +14,10 @@ final class RubyLabel: NSView {
     var segments: [LyricsRomanizer.RubySegment] = [] {
         didSet { needsDisplay = true }
     }
+    /// 글자 색과 그 위 발음의 색.
+    var colors: (text: NSColor, reading: NSColor) = (.labelColor, .secondaryLabelColor) {
+        didSet { needsDisplay = true }
+    }
 
     init(font: NSFont) {
         self.font = font
@@ -39,9 +43,9 @@ final class RubyLabel: NSView {
 
     private func cells() -> [Cell] {
         segments.map { segment in
-            let text = NSAttributedString(string: segment.text, attributes: [.font: font, .foregroundColor: NSColor.labelColor])
+            let text = NSAttributedString(string: segment.text, attributes: [.font: font, .foregroundColor: colors.text])
             let reading = segment.reading.map {
-                NSAttributedString(string: $0, attributes: [.font: rubyFont, .foregroundColor: NSColor.secondaryLabelColor])
+                NSAttributedString(string: $0, attributes: [.font: rubyFont, .foregroundColor: colors.reading])
             }
             let textWidth = ceil(text.size().width)
             let readingWidth = ceil(reading?.size().width ?? 0)

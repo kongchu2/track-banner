@@ -54,6 +54,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         get { UserDefaults.standard.bool(forKey: Self.hideLyricsOnHoverKey) }
         set { UserDefaults.standard.set(newValue, forKey: Self.hideLyricsOnHoverKey); lyricsPanel.hidesOnHover = newValue }
     }
+    private static let lyricsBackgroundKey = "LyricsBackgroundStyle"
+    /// 화면의 가사 배경을 앨범 커버로 꾸미는 방식. nil이면 기본 유리 배경이다.
+    private var lyricsBackgroundStyle: LyricsPanelController.BackgroundStyle? {
+        get { UserDefaults.standard.string(forKey: Self.lyricsBackgroundKey).flatMap(LyricsPanelController.BackgroundStyle.init) }
+        set {
+            UserDefaults.standard.set(newValue?.rawValue, forKey: Self.lyricsBackgroundKey)
+            lyricsPanel.backgroundStyle = newValue
+        }
+    }
+
+    /// 가사 패널의 배경을 지금 곡의 커버에 맞춘다.
+    /// 곡이 바뀌어 새 커버를 받는 동안에는 부르지 않는다. 그사이 앞 곡의 배경이 남아 있다가 새 것으로 겹쳐 바뀐다.
+    private func updateLyricsCover() {
+        lyricsPanel.artwork = latestArtwork
+    }
     private static let lyricsPronunciationKey = "LyricsPronunciationStyle"
     /// 화면의 가사에 발음을 로마자로 붙이는 방식. nil이면 붙이지 않는다.
     private var lyricsPronunciationStyle: LyricsController.PronunciationStyle? {
@@ -171,6 +186,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             if Date().timeIntervalSince(chosen) < 10 { self.downloadTranslationLanguage(source: source) }
         }
         lyricsPanel.hidesOnHover = hidesLyricsOnHover
+        lyricsPanel.backgroundStyle = lyricsBackgroundStyle
+        updateLyricsCover()
         updateLyrics()
     }
 
@@ -294,6 +311,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             guard latestTrackID == track.id else { return }
             latestArtwork = artwork
             updateStatusItem()
+            updateLyricsCover()
             if withBanner { banner.show(track: track, artwork: artwork) }
         }
     }
@@ -333,6 +351,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         hideOnHover.target = self
         hideOnHover.indentationLevel = 1
         menu.addItem(hideOnHover)
+        let lyricsBackground = NSMenuItem(title: "가사 배경", action: nil, keyEquivalent: "")
+        lyricsBackground.indentationLevel = 1
+        let backgrounds = NSMenu()
+        for (title, style) in [("기본", nil), ("투명", LyricsPanelController.BackgroundStyle.clear), ("앨범 색", .color), ("앨범 커버", .cover)] {
+            let item = NSMenuItem(title: title, action: #selector(selectLyricsBackground(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = style?.rawValue
+            backgrounds.addItem(item)
+            if style == nil { backgrounds.addItem(.separator()) }
+        }
+        lyricsBackground.submenu = backgrounds
+        menu.addItem(lyricsBackground)
         let pronunciation = NSMenuItem(title: "발음 표기(로마자)", action: nil, keyEquivalent: "")
         pronunciation.indentationLevel = 1
         let styles = NSMenu()
@@ -419,6 +449,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func toggleHideLyricsOnHover(_ sender: NSMenuItem) {
         hidesLyricsOnHover.toggle()
+    }
+
+    @objc private func selectLyricsBackground(_ sender: NSMenuItem) {
+        lyricsBackgroundStyle = (sender.representedObject as? String).flatMap(LyricsPanelController.BackgroundStyle.init)
     }
 
     @objc private func selectLyricsPronunciation(_ sender: NSMenuItem) {
@@ -571,6 +605,10 @@ extension AppDelegate: NSMenuItemValidation {
         if menuItem.action == #selector(toggleHideLyricsOnHover(_:)) {
             menuItem.state = hidesLyricsOnHover ? .on : .off
             // 화면에 가사를 띄우지 않으면 고를 것이 없다.
+            return showsFloatingLyrics
+        }
+        if menuItem.action == #selector(selectLyricsBackground(_:)) {
+            menuItem.state = menuItem.representedObject as? String == lyricsBackgroundStyle?.rawValue ? .on : .off
             return showsFloatingLyrics
         }
         if menuItem.action == #selector(selectLyricsPronunciation(_:)) {

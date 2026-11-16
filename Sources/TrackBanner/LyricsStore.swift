@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 /// 곡의 싱크 가사를 찾아 온다: Spotify 자체 가사(사이드카에 로그인했을 때) → LRCLIB.
 /// 찾은 가사와 "없음"은 디스크에 남겨 같은 곡을 다시 묻지 않는다.
@@ -24,6 +25,10 @@ final class LyricsStore {
     private static let missTTL: TimeInterval = 24 * 60 * 60
     /// 메모리에 들고 있는 곡 수. 같은 곡을 되풀이해 들을 때 디스크를 읽지 않으려는 것뿐이라 작아도 된다.
     private static let memoryLimit = 32
+
+    /// 가사가 왜 안 나오는지 볼 수 있게 조회 결과를 남긴다:
+    /// log stream --predicate 'subsystem == "com.kongchu2.trackbanner"'
+    private static let log = Logger(subsystem: "com.kongchu2.trackbanner", category: "lyrics")
 
     private let sidecar: LyricsSidecar
     private let translator: LyricsTranslator
@@ -63,16 +68,29 @@ final class LyricsStore {
         case .unavailable:
             break
         }
+        var source = lines == nil ? "none" : "spotify"
         var fetchedAt = Date()
         if lines == nil {
             if let cached, !isStale {
                 // Spotify에만 다시 물어본 것이다. LRCLIB의 답은 전에 받아 둔 그대로 쓴다.
                 lines = cached.lines
                 fetchedAt = cached.fetchedAt
+                if lines != nil { source = "kept from cache" }
             } else {
-                do { lines = try await LRCLIB.lines(for: track) } catch { isDefinite = false }
+                do {
+                    lines = try await LRCLIB.lines(for: track)
+                    if lines != nil { source = "lrclib" }
+                } catch {
+                    isDefinite = false
+                    source = "lrclib failed"
+                }
             }
         }
+        Self.log.info("""
+        \(id, privacy: .public) "\(track.name, privacy: .public)" / "\(track.artist, privacy: .public)" / \
+        "\(track.album, privacy: .public)" / \(track.durationMs ?? -1) ms → \(source, privacy: .public), \
+        \(lines?.count ?? 0) lines, asked Spotify: \(askedSpotify)
+        """)
 
         if lines != nil || isDefinite {
             // 가사가 그대로면 전에 해 둔 번역도 그대로 쓴다.
