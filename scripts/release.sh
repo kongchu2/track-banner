@@ -78,8 +78,13 @@ fi
 # ---- 빌드·서명 ----
 
 rm -f "$ZIP" "$SUBMIT_ZIP"
-./build.sh
+# 배포하는 앱에는 Spotify 가사 사이드카가 꼭 들어 있어야 한다.
+REQUIRE_SIDECAR=1 ./build.sh
 codesign --verify --strict --verbose=2 "$APP"
+SIDECAR_INFO=$(codesign -dvv "$APP/Contents/MacOS/lyrics-sidecar" 2>&1) || die "lyrics-sidecar 가 서명되지 않았습니다."
+[[ "$SIDECAR_INFO" == *$'\nTeamIdentifier='"$TEAM_ID"* ]] || die "lyrics-sidecar 가 팀 $TEAM_ID 의 인증서로 서명되지 않았습니다."
+[[ "$SIDECAR_INFO" == *"(runtime)"* ]] || die "lyrics-sidecar 에 강화된 런타임이 없습니다."
+[ "$(lipo -archs "$APP/Contents/MacOS/lyrics-sidecar")" = "x86_64 arm64" ] || die "lyrics-sidecar 가 유니버설 바이너리가 아닙니다."
 SIGN_INFO=$(codesign -dvv "$APP" 2>&1)
 [[ "$SIGN_INFO" == *$'\nAuthority=Developer ID Application'* ]] || die "Developer ID 로 서명되지 않았습니다."
 [[ "$SIGN_INFO" == *$'\nTeamIdentifier='"$TEAM_ID"* ]] || die "팀 $TEAM_ID 의 인증서로 서명되지 않았습니다."

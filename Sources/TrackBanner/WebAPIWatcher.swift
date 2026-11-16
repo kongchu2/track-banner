@@ -16,6 +16,7 @@ final class WebAPIWatcher {
         struct Item: Decodable {
             let uri: String
             let name: String
+            let duration_ms: Int?
             // 곡에만 있다.
             let artists: [Named]?
             let album: Named?
@@ -23,12 +24,15 @@ final class WebAPIWatcher {
             let show: Named?
         }
         let is_playing: Bool
+        let progress_ms: Int?
         let currently_playing_type: String?
         let item: Item?
     }
 
     /// 폴링할 때마다 지금 상태를 알린다(바뀌지 않았어도 알린다).
     var onState: ((PlaybackState) -> Void)?
+    /// 재생 중이라는 응답에 실려 온 재생 위치. `onState`보다 먼저 알린다.
+    var onPosition: ((PlaybackPosition) -> Void)?
 
     private let auth: SpotifyAuth
     private var task: Task<Void, Never>?
@@ -56,6 +60,14 @@ final class WebAPIWatcher {
         run(after: Self.playingInterval)
     }
 
+    /// 다음 차례를 기다리지 않고 곧 물어본다. 곡이 바뀐 것을 다른 경로로 먼저 알았을 때 쓴다.
+    /// Web API가 그 변화를 따라잡도록 잠깐은 기다린다.
+    func pollSoon() {
+        guard task != nil else { return }
+        stop()
+        run(after: 0.7)
+    }
+
     private func run(after initialDelay: TimeInterval) {
         task = Task { [weak self] in
             var delay = initialDelay
@@ -74,13 +86,20 @@ final class WebAPIWatcher {
         // additional_types가 없으면 에피소드를 재생할 때 item이 비어서 온다.
         var request = URLRequest(url: URL(string: "https://api.spotify.com/v1/me/player/currently-playing?additional_types=episode")!)
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let asked = Date()
         guard let (data, response) = try? await URLSession.shared.data(for: request),
               let http = response as? HTTPURLResponse, !Task.isCancelled else { return 5 }
 
         switch http.statusCode {
         case 200:
             guard let playback = try? JSONDecoder().decode(Playback.self, from: data) else { return 5 }
-            return report(state(of: playback))
+            let state = state(of: playback)
+            if state?.isPlaying == true, let item = playback.item, let progress = playback.progress_ms {
+                // 위치는 요청을 보내고 응답을 받는 사이 어느 시점의 값이다. 그 가운데로 본다.
+                let at = asked.addingTimeInterval(Date().timeIntervalSince(asked) / 2)
+                onPosition?(PlaybackPosition(trackID: item.uri, positionMs: Double(progress), at: at))
+            }
+            return report(state)
         case 204:
             // 재생 중인 기기가 없다.
             missingItemCount = 0
@@ -121,7 +140,8 @@ final class WebAPIWatcher {
             id: item.uri,
             name: item.name,
             artist: item.artists?.map(\.name).joined(separator: ", ") ?? item.show?.name ?? "",
-            album: item.album?.name ?? item.show?.name ?? ""
+            album: item.album?.name ?? item.show?.name ?? "",
+            durationMs: item.duration_ms.flatMap { $0 > 0 ? $0 : nil }
         ))
     }
 }
