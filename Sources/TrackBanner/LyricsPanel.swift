@@ -22,6 +22,17 @@ final class LyricsPanelController {
         didSet { if !hidesOnHover { endHoverHiding() } }
     }
 
+    /// 다른 앱에서 글자를 치고 있는 자리(화면 좌표). 패널이 그 자리를 가리면 치는 동안 숨긴다.
+    var typingArea: NSRect? {
+        didSet {
+            guard let panel else { return }
+            let hidden = overlapsTyping(panel.frame)
+            guard hidden != isTypingHidden else { return }
+            isTypingHidden = hidden
+            applyHiding(duration: hidden ? 0.15 : 0.2)
+        }
+    }
+
     enum BackgroundStyle: String {
         /// 뒤의 화면이 비치는 유리.
         case clear
@@ -54,8 +65,10 @@ final class LyricsPanelController {
     /// 마우스가 올라와 있어 숨긴 상태. 패널은 그대로 떠 있고 보이지만 않는다.
     private var isHoverHidden = false
     private var hoverTimer: Timer?
-    /// 숨겨져 있지 않을 때의 불투명도.
-    private var visibleAlpha: CGFloat { isHoverHidden ? 0 : 1 }
+    /// 글자를 치는 자리를 가려서 숨긴 상태.
+    private var isTypingHidden = false
+    /// 줄이 떠 있는 동안의 불투명도. 마우스나 글자 입력 때문에 숨겼으면 0이다.
+    private var visibleAlpha: CGFloat { isHoverHidden || isTypingHidden ? 0 : 1 }
 
     /// 패널이 놓이는 기준점: 아래쪽 가운데. 줄 길이에 따라 패널은 이 점에서 양옆과 위로 늘어난다.
     private var anchor: NSPoint? {
@@ -109,6 +122,9 @@ final class LyricsPanelController {
         isHiding = false
         if wasVisible, shownLine == line { return }
         shownLine = line
+        // 줄이 길어지면 치고 있는 자리까지 덮을 수 있다. 새 크기로 다시 따진다.
+        isTypingHidden = overlapsTyping(target)
+        panel.ignoresMouseEvents = isHoverHidden || isTypingHidden
 
         if wasVisible {
             // 글자는 겹쳐 바뀌고 패널은 그 길이에 맞춰 늘거나 준다.
@@ -161,11 +177,7 @@ final class LyricsPanelController {
     private func beginHoverHiding() {
         guard hidesOnHover, !isHoverHidden, !NSEvent.modifierFlags.contains(.command), let panel else { return }
         isHoverHidden = true
-        panel.ignoresMouseEvents = true
-        NSAnimationContext.runAnimationGroup { ctx in
-            ctx.duration = 0.15
-            panel.animator().alphaValue = 0
-        }
+        applyHiding(duration: 0.15)
         // 클릭을 통과시키는 동안은 마우스가 나갔다는 알림도 오지 않는다. 숨겨 둔 동안만 위치를 직접 확인한다.
         hoverTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated {
@@ -178,13 +190,23 @@ final class LyricsPanelController {
     private func endHoverHiding() {
         hoverTimer?.invalidate()
         hoverTimer = nil
-        guard isHoverHidden, let panel else { return }
+        guard isHoverHidden else { return }
         isHoverHidden = false
-        panel.ignoresMouseEvents = false
+        applyHiding(duration: 0.2)
+    }
+
+    private func overlapsTyping(_ frame: NSRect) -> Bool {
+        typingArea.map { frame.insetBy(dx: -8, dy: -8).intersects($0) } ?? false
+    }
+
+    /// 숨김 상태가 바뀐 것을 패널에 옮긴다. 숨긴 동안은 클릭이 아래 창으로 지나간다.
+    private func applyHiding(duration: TimeInterval) {
+        guard let panel else { return }
+        panel.ignoresMouseEvents = isHoverHidden || isTypingHidden
         guard panel.isVisible, !isHiding else { return }
         NSAnimationContext.runAnimationGroup { ctx in
-            ctx.duration = 0.2
-            panel.animator().alphaValue = 1
+            ctx.duration = duration
+            panel.animator().alphaValue = visibleAlpha
         }
     }
 

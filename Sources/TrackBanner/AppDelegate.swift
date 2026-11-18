@@ -54,6 +54,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         get { UserDefaults.standard.bool(forKey: Self.hideLyricsOnHoverKey) }
         set { UserDefaults.standard.set(newValue, forKey: Self.hideLyricsOnHoverKey); lyricsPanel.hidesOnHover = newValue }
     }
+    private static let hideLyricsWhileTypingKey = "HideLyricsWhileTyping"
+    private let typingWatcher = TypingWatcher()
+    /// 화면의 가사가 글자를 치고 있는 자리를 가리면, 치는 동안 가사를 숨긴다. 손쉬운 사용 권한이 필요하다.
+    private var hidesLyricsWhileTyping: Bool {
+        get { UserDefaults.standard.bool(forKey: Self.hideLyricsWhileTypingKey) }
+        set { UserDefaults.standard.set(newValue, forKey: Self.hideLyricsWhileTypingKey); updateLyrics() }
+    }
     private static let lyricsBackgroundKey = "LyricsBackgroundStyle"
     /// 화면의 가사 배경을 앨범 커버로 꾸미는 방식. nil이면 기본 유리 배경이다.
     private var lyricsBackgroundStyle: LyricsPanelController.BackgroundStyle? {
@@ -186,6 +193,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             if Date().timeIntervalSince(chosen) < 10 { self.downloadTranslationLanguage(source: source) }
         }
         lyricsPanel.hidesOnHover = hidesLyricsOnHover
+        typingWatcher.onArea = { [weak self] in self?.lyricsPanel.typingArea = $0 }
         lyricsPanel.backgroundStyle = lyricsBackgroundStyle
         updateLyricsCover()
         updateLyrics()
@@ -199,6 +207,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         lyrics.pronunciationStyle = showsFloatingLyrics ? lyricsPronunciationStyle : nil
         lyrics.translationLanguage = showsFloatingLyrics ? lyricsTranslationLanguage : nil
         if enabled { sidecar.start() } else { sidecar.stop() }
+        typingWatcher.isEnabled = showsFloatingLyrics && hidesLyricsWhileTyping
         lyricsPanel.show(showsFloatingLyrics ? lyricLine : nil)
         updateStatusItem()
     }
@@ -351,6 +360,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         hideOnHover.target = self
         hideOnHover.indentationLevel = 1
         menu.addItem(hideOnHover)
+        let hideWhileTyping = NSMenuItem(title: "입력 중인 곳을 가리면 가사 숨기기", action: #selector(toggleHideLyricsWhileTyping(_:)), keyEquivalent: "")
+        hideWhileTyping.target = self
+        hideWhileTyping.indentationLevel = 1
+        menu.addItem(hideWhileTyping)
         let lyricsBackground = NSMenuItem(title: "가사 배경", action: nil, keyEquivalent: "")
         lyricsBackground.indentationLevel = 1
         let backgrounds = NSMenu()
@@ -449,6 +462,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func toggleHideLyricsOnHover(_ sender: NSMenuItem) {
         hidesLyricsOnHover.toggle()
+    }
+
+    @objc private func toggleHideLyricsWhileTyping(_ sender: NSMenuItem) {
+        hidesLyricsWhileTyping.toggle()
+        // 다른 앱의 커서 위치는 손쉬운 사용 권한이 있어야 읽을 수 있다. 켤 때 한 번 안내한다.
+        if hidesLyricsWhileTyping, !TypingWatcher.isTrusted { TypingWatcher.requestAccess() }
     }
 
     @objc private func selectLyricsBackground(_ sender: NSMenuItem) {
@@ -605,6 +624,11 @@ extension AppDelegate: NSMenuItemValidation {
         if menuItem.action == #selector(toggleHideLyricsOnHover(_:)) {
             menuItem.state = hidesLyricsOnHover ? .on : .off
             // 화면에 가사를 띄우지 않으면 고를 것이 없다.
+            return showsFloatingLyrics
+        }
+        if menuItem.action == #selector(toggleHideLyricsWhileTyping(_:)) {
+            // 켜 두었지만 손쉬운 사용 권한이 아직 없으면 동작하지 않는다.
+            menuItem.state = !hidesLyricsWhileTyping ? .off : TypingWatcher.isTrusted ? .on : .mixed
             return showsFloatingLyrics
         }
         if menuItem.action == #selector(selectLyricsBackground(_:)) {
